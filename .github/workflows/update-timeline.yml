@@ -63,7 +63,7 @@ jobs:
         shell: bash
         run: |
           mkdir _site
-          cp index.html timeline.png _site/
+          cp index.html timeline.html timeline.png _site/
           touch _site/.nojekyll
 
       - name: Upload Pages artifact
