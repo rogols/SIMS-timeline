@@ -34,8 +34,6 @@ COLORS = {
     "future": "#B8CDD0",
     "past": "#4EA5B5",
     "today": "#F26B3A",
-    "card": "#FFFFFF",
-    "shadow": "#E4ECE9",
     "lab": "#35A6A0",
     "exam": "#D65A45",
     "presentation": "#E49A32",
@@ -209,15 +207,6 @@ def text_width(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont) 
     return box[2] - box[0]
 
 
-def truncate_text(draw: ImageDraw.ImageDraw, text: str, font: ImageFont.ImageFont, width: int) -> str:
-    if text_width(draw, text, font) <= width:
-        return text
-    suffix = "…"
-    while text and text_width(draw, text + suffix, font) > width:
-        text = text[:-1]
-    return text.rstrip() + suffix
-
-
 def format_day(value: date) -> str:
     return f"{value.day} {value.strftime('%b').upper()}"
 
@@ -277,7 +266,6 @@ def render_timeline(events: list[Event], today: date, output: Path) -> None:
     label_font = load_font(21, bold=True)
     small_font = load_font(17)
     tiny_font = load_font(15, bold=True)
-    card_font = load_font(25, bold=True)
 
     draw.text((MARGIN_X, 45), "SIMS · COURSE TIMELINE", fill=COLORS["ink"], font=title_font)
     subtitle = f"{format_day(start)} — {format_day(end)}  ·  {len(events)} scheduled activities"
@@ -348,23 +336,30 @@ def render_timeline(events: list[Event], today: date, output: Path) -> None:
     draw.rounded_rectangle((status_left, LINE_Y + 70, status_left + status_width, LINE_Y + 106), radius=18, fill=COLORS["today"])
     draw.text((status_left + 15, LINE_Y + 79), status, fill="white", font=tiny_font)
 
-    upcoming = [event for event in events if event.start.date() >= today]
-    card_top = 495
-    draw.rounded_rectangle((MARGIN_X + 4, card_top + 5, WIDTH - MARGIN_X + 4, HEIGHT - 36 + 5), radius=20, fill=COLORS["shadow"])
-    draw.rounded_rectangle((MARGIN_X, card_top, WIDTH - MARGIN_X, HEIGHT - 36), radius=20, fill=COLORS["card"])
-    if upcoming:
-        next_event = upcoming[0]
-        prefix = "NEXT"
-        next_text = f"{category(next_event.summary)} · {format_day(next_event.day)} · {next_event.start.strftime('%H:%M')}"
-    else:
-        prefix = "STATUS"
-        next_text = "All scheduled course activities are complete"
-    draw.text((MARGIN_X + 28, card_top + 19), prefix, fill=COLORS["today"], font=tiny_font)
-    next_text = truncate_text(draw, next_text, card_font, WIDTH - 2 * MARGIN_X - 210)
-    draw.text((MARGIN_X + 145, card_top + 12), next_text, fill=COLORS["ink"], font=card_font)
+    footer_top = 488
+    draw.line((MARGIN_X, footer_top, WIDTH - MARGIN_X, footer_top), fill=COLORS["faint"], width=2)
+    draw.text(
+        (MARGIN_X, footer_top + 18),
+        "Each stem is a scheduled day · taller stems contain more activities",
+        fill=COLORS["muted"],
+        font=small_font,
+    )
+    legend_items = [
+        ("Lecture", COLORS["lecture"]),
+        ("Laboratory", COLORS["lab"]),
+        ("Seminar / presentation", COLORS["presentation"]),
+        ("Self-study / project", COLORS["study"]),
+        ("Other", COLORS["other"]),
+    ]
+    legend_x = MARGIN_X
+    for legend_label, legend_color in legend_items:
+        legend_y = footer_top + 54
+        draw.ellipse((legend_x, legend_y, legend_x + 14, legend_y + 14), fill=legend_color)
+        draw.text((legend_x + 23, legend_y - 3), legend_label, fill=COLORS["ink"], font=small_font)
+        legend_x += 205 + text_width(draw, legend_label, small_font)
     source_text = "TimeEdit schedule · updated automatically every day at 06:00 Europe/Stockholm"
     source_width = text_width(draw, source_text, small_font)
-    draw.text((WIDTH - MARGIN_X - source_width - 28, card_top + 52), source_text, fill=COLORS["muted"], font=small_font)
+    draw.text((WIDTH - MARGIN_X - source_width, HEIGHT - 28), source_text, fill=COLORS["muted"], font=small_font)
 
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_name(output.name + ".tmp")

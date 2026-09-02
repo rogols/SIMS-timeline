@@ -8,13 +8,22 @@ The image is generated from the public TimeEdit calendar every day at **06:00
 Europe/Stockholm** and is also regenerated after pushes to `main` or when the
 workflow is started manually.
 
+An interactive, responsive alternative is published at:
+
+<https://rogols.github.io/SIMS-timeline/timeline.html>
+
+`timeline.html` is a self-contained HTML/CSS/JavaScript page. It reads the
+public TimeEdit feed directly when opened, marks current course progression,
+and explains activity categories through a legend and accessible date markers.
+
 ## How it works
 
 1. `.github/workflows/update-timeline.yml` downloads the public calendar.
 2. `generate_timeline.py` parses its course events and renders a deterministic
    2400 × 600 PNG with Pillow.
 3. The workflow commits `timeline.png` only if its bytes changed.
-4. The same workflow deploys `index.html` and `timeline.png` to GitHub Pages.
+4. The same workflow deploys `index.html`, `timeline.html`, and `timeline.png`
+   to GitHub Pages.
 
 The checked-in `index.html` remains the page shell. Canvas can keep using the
 stable direct image URL while the file behind that URL changes.

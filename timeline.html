@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SIMS Course Timeline</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --background: #f7faf8;
+      --surface: #ffffff;
+      --ink: #18313d;
+      --muted: #617780;
+      --track: #bfd1d2;
+      --grid: #dce7e6;
+      --past: #4ea5b5;
+      --today: #f26b3a;
+      --lecture: #5d92b8;
+      --laboratory: #35a6a0;
+      --seminar: #d99a32;
+      --presentation: #e26d42;
+      --study: #79ad5d;
+      --other: #7a91a0;
+      --error: #a63232;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--background);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: 100%;
+      padding: 26px 32px 20px;
+    }
+
+    header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin: 0 auto 8px;
+      max-width: 1440px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.35rem, 2.6vw, 2.25rem);
+      line-height: 1.08;
+      letter-spacing: .035em;
+      font-weight: 700;
+    }
+
+    #period {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+
+    #progress-label {
+      margin: 0;
+      color: var(--today);
+      font-size: .9rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .timeline-scroll {
+      width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: thin;
+    }
+
+    #timeline {
+      display: block;
+      width: 100%;
+      min-width: 820px;
+      height: auto;
+      margin: 0 auto;
+      max-width: 1440px;
+    }
+
+    .axis-label,
+    .endpoint-label,
+    .today-label {
+      font-family: inherit;
+      fill: var(--muted);
+      font-size: 13px;
+    }
+
+    .endpoint-label {
+      fill: var(--ink);
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .today-label {
+      fill: var(--today);
+      font-weight: 700;
+    }
+
+    .event-day {
+      cursor: default;
+      outline: none;
+    }
+
+    .event-day:focus .focus-ring,
+    .event-day:hover .focus-ring {
+      opacity: 1;
+    }
+
+    .focus-ring {
+      fill: none;
+      stroke: var(--ink);
+      stroke-width: 2;
+      opacity: 0;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px 22px;
+      max-width: 1440px;
+      margin: 0 auto;
+      color: var(--muted);
+      font-size: .82rem;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      white-space: nowrap;
+    }
+
+    .legend-symbol {
+      width: 11px;
+      height: 11px;
+      background: var(--symbol-color);
+      display: inline-block;
+    }
+
+    .legend-symbol.circle { border-radius: 50%; }
+    .legend-symbol.diamond { transform: rotate(45deg); }
+    .legend-symbol.triangle {
+      width: 0;
+      height: 0;
+      background: transparent;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-bottom: 11px solid var(--symbol-color);
+    }
+
+    #detail {
+      min-height: 42px;
+      max-width: 1440px;
+      margin: 14px auto 0;
+      padding: 10px 14px;
+      border-left: 4px solid var(--today);
+      background: var(--surface);
+      color: var(--ink);
+      font-size: .9rem;
+    }
+
+    #detail strong { font-weight: 700; }
+    #detail .hint { color: var(--muted); }
+
+    #error {
+      display: none;
+      max-width: 1440px;
+      margin: 20px auto;
+      color: var(--error);
+      font-weight: 600;
+    }
+
+    @media (max-width: 700px) {
+      main { padding: 20px 16px 16px; }
+      header { align-items: start; flex-direction: column; gap: 4px; }
+      #progress-label { white-space: normal; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>SIMS · COURSE PROGRESSION</h1>
+        <p id="period">Loading TimeEdit schedule…</p>
+      </div>
+      <p id="progress-label" aria-live="polite"></p>
+    </header>
+
+    <p id="error" role="alert"></p>
+
+    <div class="timeline-scroll">
+      <svg id="timeline" viewBox="0 0 1440 360" role="img" aria-labelledby="timeline-title timeline-description">
+        <title id="timeline-title">SIMS course progression</title>
+        <desc id="timeline-description">A timeline of course activity categories from the public TimeEdit schedule.</desc>
+      </svg>
+    </div>
+
+    <div id="legend" class="legend" aria-label="Activity category legend"></div>
+    <div id="detail" aria-live="polite">
+      <span class="hint">Hover over or focus a date marker to see its activity categories.</span>
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const ICS_URL = "https://cloud.timeedit.net/miun/web/student/ri61166650000YQQ41Z6501001y5Y492Xg10g3X9Y65Z9216082QXXX395861417271X1X602577133151181936XX21450911X69616kZl4Z116369wn0Qo62tnZ4n7t01okd64kjQu6Q50Z5l1EQA8DD43A5461AC25C56270504E27BDC8.ics";
+      const COURSE_TIME_ZONE = "Europe/Stockholm";
+      const SVG_NS = "http://www.w3.org/2000/svg";
+      const svg = document.getElementById("timeline");
+      const periodElement = document.getElementById("period");
+      const progressElement = document.getElementById("progress-label");
+      const detailElement = document.getElementById("detail");
+      const legendElement = document.getElementById("legend");
+      const errorElement = document.getElementById("error");
+
+      const categories = [
+        { label: "Examination", pattern: /\b(tentamen|examination|exam|quiz)\b/i, color: "var(--other)", shape: "square" },
+        { label: "Presentation", pattern: /\b(redovisning|presentation|demo)\b/i, color: "var(--presentation)", shape: "triangle" },
+        { label: "Seminar", pattern: /\b(seminarium|seminar)\b/i, color: "var(--seminar)", shape: "square" },
+        { label: "Laboratory", pattern: /\b(laboration|laboratory|lab)\b/i, color: "var(--laboratory)", shape: "diamond" },
+        { label: "Workshop", pattern: /\b(workshop)\b/i, color: "var(--seminar)", shape: "diamond" },
+        { label: "Supervision", pattern: /\b(handledning|supervision)\b/i, color: "var(--other)", shape: "circle" },
+        { label: "Lecture", pattern: /\b(föreläsning|lecture)\b/i, color: "var(--lecture)", shape: "circle" },
+        { label: "Introduction", pattern: /\b(introduktion|introduction)\b/i, color: "var(--lecture)", shape: "circle" },
+        { label: "Self-study", pattern: /\b(egna studier|self[- ]study)\b/i, color: "var(--study)", shape: "square" },
+        { label: "Project work", pattern: /\b(projektarbete|project work|grupparbete)\b/i, color: "var(--study)", shape: "diamond" },
+        { label: "Course activity", pattern: /.*/i, color: "var(--other)", shape: "circle" }
+      ];
+
+      function element(name, attributes = {}) {
+        const node = document.createElementNS(SVG_NS, name);
+        for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, String(value));
+        return node;
+      }
+
+      function unfoldIcs(text) {
+        return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/\n[ \t]/g, "");
+      }
+
+      function unescapeIcs(value) {
+        return value
+          .replace(/\\[nN]/g, "\n")
+          .replace(/\\,/g, ",")
+          .replace(/\\;/g, ";")
+          .replace(/\\\\/g, "\\");
+      }
+
+      function parseIcsDate(raw) {
+        if (/^\d{8}$/.test(raw)) {
+          return new Date(Date.UTC(+raw.slice(0, 4), +raw.slice(4, 6) - 1, +raw.slice(6, 8), 12));
+        }
+        const utc = raw.endsWith("Z");
+        const value = utc ? raw.slice(0, -1) : raw;
+        const year = +value.slice(0, 4);
+        const month = +value.slice(4, 6) - 1;
+        const day = +value.slice(6, 8);
+        const hour = +value.slice(9, 11) || 0;
+        const minute = +value.slice(11, 13) || 0;
+        const second = +value.slice(13, 15) || 0;
+        return utc
+          ? new Date(Date.UTC(year, month, day, hour, minute, second))
+          : new Date(year, month, day, hour, minute, second);
+      }
+
+      function parseEvents(text) {
+        const events = [];
+        const blocks = unfoldIcs(text).split("BEGIN:VEVENT").slice(1);
+        for (const block of blocks) {
+          const values = {};
+          for (const line of block.split("\n")) {
+            const colon = line.indexOf(":");
+            if (colon < 0) continue;
+            const name = line.slice(0, colon).split(";", 1)[0].toUpperCase();
+            if (["DTSTART", "DTEND", "SUMMARY", "STATUS"].includes(name)) values[name] = line.slice(colon + 1);
+          }
+          if (!values.DTSTART || String(values.STATUS || "").toUpperCase() === "CANCELLED") continue;
+          events.push({
+            start: parseIcsDate(values.DTSTART),
+            end: parseIcsDate(values.DTEND || values.DTSTART),
+            summary: unescapeIcs(values.SUMMARY || "Course activity")
+          });
+        }
+        return events.sort((a, b) => a.start - b.start);
+      }
+
+      function categoryFor(summary) {
+        return categories.find(category => category.pattern.test(summary)) || categories[categories.length - 1];
+      }
+
+      function dateKey(value) {
+        const parts = new Intl.DateTimeFormat("en-CA", {
+          timeZone: COURSE_TIME_ZONE,
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit"
+        }).formatToParts(value);
+        const lookup = Object.fromEntries(parts.map(part => [part.type, part.value]));
+        return `${lookup.year}-${lookup.month}-${lookup.day}`;
+      }
+
+      function dateFromKey(key) {
+        const [year, month, day] = key.split("-").map(Number);
+        return new Date(Date.UTC(year, month - 1, day, 12));
+      }
+
+      function dayNumber(key) {
+        return Math.floor(dateFromKey(key).getTime() / 86400000);
+      }
+
+      function displayDate(key, includeYear = false) {
+        return new Intl.DateTimeFormat("en-GB", {
+          timeZone: "UTC",
+          day: "numeric",
+          month: "short",
+          ...(includeYear ? { year: "numeric" } : {})
+        }).format(dateFromKey(key));
+      }
+
+      function displayTime(value) {
+        return new Intl.DateTimeFormat("en-GB", {
+          timeZone: COURSE_TIME_ZONE,
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false
+        }).format(value);
+      }
+
+      function addText(x, y, text, className, anchor = "middle") {
+        const node = element("text", { x, y, class: className, "text-anchor": anchor });
+        node.textContent = text;
+        svg.appendChild(node);
+        return node;
+      }
+
+      function drawSymbol(parent, shape, x, y, color) {
+        let mark;
+        if (shape === "square") {
+          mark = element("rect", { x: x - 6, y: y - 6, width: 12, height: 12, rx: 2, fill: color });
+        } else if (shape === "diamond") {
+          mark = element("rect", { x: x - 5.5, y: y - 5.5, width: 11, height: 11, rx: 1, fill: color, transform: `rotate(45 ${x} ${y})` });
+        } else if (shape === "triangle") {
+          mark = element("path", { d: `M ${x} ${y - 7} L ${x + 7} ${y + 6} L ${x - 7} ${y + 6} Z`, fill: color });
+        } else {
+          mark = element("circle", { cx: x, cy: y, r: 6, fill: color });
+        }
+        parent.appendChild(mark);
+      }
+
+      function renderLegend(usedLabels) {
+        legendElement.replaceChildren();
+        const intro = document.createElement("span");
+        intro.textContent = "Each symbol is one scheduled activity:";
+        legendElement.appendChild(intro);
+        for (const category of categories.filter(item => usedLabels.has(item.label))) {
+          const item = document.createElement("span");
+          item.className = "legend-item";
+          const symbol = document.createElement("span");
+          symbol.className = `legend-symbol ${category.shape}`;
+          symbol.style.setProperty("--symbol-color", category.color);
+          const label = document.createElement("span");
+          label.textContent = category.label;
+          item.append(symbol, label);
+          legendElement.appendChild(item);
+        }
+      }
+
+      function render(events) {
+        if (!events.length) throw new Error("The calendar did not contain any scheduled activities.");
+
+        svg.querySelectorAll(":scope > :not(title):not(desc)").forEach(node => node.remove());
+        const grouped = new Map();
+        const usedLabels = new Set();
+        for (const event of events) {
+          const key = dateKey(event.start);
+          const item = { ...event, category: categoryFor(event.summary) };
+          usedLabels.add(item.category.label);
+          if (!grouped.has(key)) grouped.set(key, []);
+          grouped.get(key).push(item);
+        }
+
+        const keys = [...grouped.keys()].sort();
+        const startKey = keys[0];
+        const endKey = keys[keys.length - 1];
+        const todayKey = dateKey(new Date());
+        const startDay = dayNumber(startKey);
+        const endDay = dayNumber(endKey);
+        const todayDay = dayNumber(todayKey);
+        const span = Math.max(1, endDay - startDay);
+        const left = 82;
+        const right = 1358;
+        const lineY = 225;
+        const xForDay = key => left + Math.max(0, Math.min(1, (dayNumber(key) - startDay) / span)) * (right - left);
+
+        periodElement.textContent = `${displayDate(startKey, true)} — ${displayDate(endKey, true)} · ${events.length} scheduled activities`;
+        const percentage = Math.max(0, Math.min(100, Math.round(((todayDay - startDay) / span) * 100)));
+        progressElement.textContent = todayDay < startDay
+          ? `Course starts ${displayDate(startKey)}`
+          : todayDay > endDay
+            ? "Course complete"
+            : `Today · ${displayDate(todayKey)} · ${percentage}%`;
+
+        const gridGroup = element("g", { "aria-hidden": "true" });
+        svg.appendChild(gridGroup);
+        for (let day = startDay; day <= endDay; day += 7) {
+          const key = new Date(day * 86400000).toISOString().slice(0, 10);
+          const x = xForDay(key);
+          gridGroup.appendChild(element("line", { x1: x, y1: lineY + 14, x2: x, y2: lineY + 25, stroke: "var(--grid)", "stroke-width": 2 }));
+          if ((day - startDay) % 14 === 0) addText(x, lineY + 48, displayDate(key), "axis-label");
+        }
+
+        svg.appendChild(element("line", { x1: left, y1: lineY, x2: right, y2: lineY, stroke: "var(--track)", "stroke-width": 12, "stroke-linecap": "round" }));
+        const progressX = todayDay <= startDay ? left : todayDay >= endDay ? right : xForDay(todayKey);
+        if (todayDay >= startDay) {
+          svg.appendChild(element("line", { x1: left, y1: lineY, x2: progressX, y2: lineY, stroke: "var(--past)", "stroke-width": 12, "stroke-linecap": "round" }));
+        }
+
+        addText(left, 78, "Course start", "endpoint-label", "start");
+        addText(left, 98, displayDate(startKey), "axis-label", "start");
+        svg.appendChild(element("line", { x1: left, y1: 107, x2: left, y2: lineY - 30, stroke: "var(--grid)", "stroke-width": 2 }));
+        addText(right, 78, "Course finish", "endpoint-label", "end");
+        addText(right, 98, displayDate(endKey), "axis-label", "end");
+        svg.appendChild(element("line", { x1: right, y1: 107, x2: right, y2: lineY - 30, stroke: "var(--grid)", "stroke-width": 2 }));
+
+        for (const [key, dayEvents] of grouped.entries()) {
+          const x = xForDay(key);
+          const group = element("g", {
+            class: "event-day",
+            tabindex: "0",
+            role: "button",
+            "aria-label": `${displayDate(key)}: ${dayEvents.map(event => event.category.label).join(", ")}`
+          });
+          const stackTop = lineY - 22 - (dayEvents.length - 1) * 18;
+          group.appendChild(element("line", { x1: x, y1: lineY - 6, x2: x, y2: stackTop, stroke: "var(--other)", "stroke-width": 2, opacity: .55 }));
+          dayEvents.forEach((event, index) => drawSymbol(group, event.category.shape, x, lineY - 22 - index * 18, event.category.color));
+          group.appendChild(element("circle", { class: "focus-ring", cx: x, cy: stackTop, r: 11 }));
+          const counts = new Map();
+          dayEvents.forEach(event => counts.set(event.category.label, (counts.get(event.category.label) || 0) + 1));
+          const summary = [...counts.entries()].map(([label, count]) => `${label}${count > 1 ? ` ×${count}` : ""}`).join(" · ");
+          const times = dayEvents.map(event => displayTime(event.start)).join(", ");
+          const details = `<strong>${displayDate(key, true)}</strong> · ${summary} <span class="hint">(${times})</span>`;
+          const title = element("title");
+          title.textContent = `${displayDate(key, true)} — ${summary} (${times})`;
+          group.appendChild(title);
+          const show = () => { detailElement.innerHTML = details; };
+          group.addEventListener("pointerenter", show);
+          group.addEventListener("focus", show);
+          group.addEventListener("click", show);
+          svg.appendChild(group);
+        }
+
+        if (todayDay >= startDay && todayDay <= endDay) {
+          svg.appendChild(element("line", { x1: progressX, y1: 116, x2: progressX, y2: lineY + 13, stroke: "var(--today)", "stroke-width": 3 }));
+          svg.appendChild(element("circle", { cx: progressX, cy: lineY, r: 12, fill: "var(--background)", stroke: "var(--today)", "stroke-width": 6 }));
+          addText(progressX, 106, `Today · ${displayDate(todayKey)}`, "today-label");
+        }
+
+        renderLegend(usedLabels);
+      }
+
+      async function load() {
+        try {
+          const response = await fetch(ICS_URL, { cache: "no-store" });
+          if (!response.ok) throw new Error(`TimeEdit returned HTTP ${response.status}.`);
+          render(parseEvents(await response.text()));
+        } catch (error) {
+          errorElement.style.display = "block";
+          errorElement.textContent = `The course timeline could not be loaded. ${error.message}`;
+          periodElement.textContent = "TimeEdit schedule unavailable";
+          svg.style.display = "none";
+          legendElement.style.display = "none";
+          detailElement.style.display = "none";
+        }
+      }
+
+      load();
+    })();
+  </script>
+</body>
+</html>
