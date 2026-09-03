@@ -1,60 +1,25 @@
-name: Update course timeline
+name: Publish course timeline
 
 on:
   push:
     branches:
       - main
-  schedule:
-    - cron: "0 6 * * *"
-      timezone: "Europe/Stockholm"
   workflow_dispatch:
 
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
-env:
-  TIMEEDIT_ICS_URL: >-
-    https://cloud.timeedit.net/miun/web/student/ri61166650000YQQ41Z6501001y5Y492Xg10g3X9Y65Z9216082QXXX395861417271X1X602577133151181936XX21450911X69616kZl4Z116369wn0Qo62tnZ4n7t01okd64kjQu6Q50Z5l1EQA8DD43A5461AC25C56270504E27BDC8.ics
-
 jobs:
   build:
     runs-on: ubuntu-24.04
     permissions:
-      contents: write
+      contents: read
       pages: write
       id-token: write
     steps:
       - name: Check out repository
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
-        with:
-          python-version: "3.13.7"
-          cache: "pip"
-
-      - name: Install renderer dependency
-        run: python -m pip install --requirement requirements.txt
-
-      - name: Run tests
-        run: python -m unittest -v
-
-      - name: Generate current timeline
-        run: python generate_timeline.py --output timeline.png
-
-      - name: Commit timeline only when changed
-        shell: bash
-        run: |
-          if git diff --quiet -- timeline.png; then
-            echo "timeline.png is already current"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add timeline.png
-          git commit -m "Update course timeline for $(TZ=Europe/Stockholm date +%F)"
-          git push
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
