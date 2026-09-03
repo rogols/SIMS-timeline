@@ -1,12 +1,10 @@
 # SIMS course timeline
 
-This repository publishes a wide, automatically updated course timeline at:
+This repository publishes a wide course illustration at:
 
 <https://rogols.github.io/SIMS-timeline/timeline.png>
 
-The image is generated from the public TimeEdit calendar every day at **06:00
-Europe/Stockholm** and is also regenerated after pushes to `main` or when the
-workflow is started manually.
+`timeline.png` is a manually managed static illustration.
 
 An interactive, responsive alternative is published at:
 
@@ -18,41 +16,19 @@ and explains activity categories through a legend and accessible date markers.
 
 ## How it works
 
-1. `.github/workflows/update-timeline.yml` downloads the public calendar.
-2. `generate_timeline.py` parses its course events and renders a deterministic
-   2400 × 600 PNG with Pillow.
-3. The workflow commits `timeline.png` only if its bytes changed.
-4. The same workflow deploys `index.html`, `timeline.html`, and `timeline.png`
-   to GitHub Pages.
+1. `timeline.html` reads the public TimeEdit calendar directly in the browser.
+2. `timeline.png` provides a static illustrated alternative.
+3. `.github/workflows/update-timeline.yml` publishes `index.html`,
+   `timeline.html`, and `timeline.png` to GitHub Pages after repository changes
+   or when started manually. It does not modify any of those files.
 
-The checked-in `index.html` remains the page shell. Canvas can keep using the
-stable direct image URL while the file behind that URL changes.
+The checked-in `index.html` remains the page shell. Canvas can embed either the
+interactive HTML page or the stable direct image URL.
 
 ## Manual run
 
-Open **Actions → Update course timeline → Run workflow**. No repository secrets
-are required for the current renderer because the TimeEdit feed is public and
-GitHub supplies the short-lived `GITHUB_TOKEN` automatically.
+Open **Actions → Publish course timeline → Run workflow**. No repository secrets
+are required because the TimeEdit feed is public and the workflow only deploys
+the checked-in website files.
 
-Repository **Settings → Actions → General → Workflow permissions** must allow
-read and write access. In **Settings → Pages**, set **Source** to **GitHub
-Actions**.
-
-## Local test
-
-```text
-python -m pip install -r requirements.txt
-python -m unittest -v
-set TIMEEDIT_ICS_URL=https://cloud.timeedit.net/...calendar....ics
-python generate_timeline.py
-```
-
-`--date YYYY-MM-DD` makes a run reproducible for a specific Stockholm date.
-
-## Optional future AI-generated artwork
-
-The current workflow does not call an AI service. A future AI-image variant
-would be a separate, optional generation step and would require an API account,
-API billing, a repository secret such as `OPENAI_API_KEY`, cost controls, and a
-deterministic fallback to the programmatic renderer. A ChatGPT subscription is
-not used by GitHub Actions and does not supply API credits.
+In **Settings → Pages**, set **Source** to **GitHub Actions**.
